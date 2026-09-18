@@ -1,0 +1,150 @@
+# Tests
+
+## Test 9 - Scan Buku satu halaman dan simpan hasil koreksi
+Viewport: mobile
+Covers: POST /api/scan-book multi-row extraction, photo picker and preview, review before write, editable names and long addresses, remove row, duplicate warning, POST /api/book-records batch save, persistence
+Description: Memastikan daftar satu halaman bisa diperiksa per baris lalu disimpan tanpa mengubah catatan lama.
+
+Steps:
+1. Buka Scan Buku, lalu pilih foto halaman daftar uji yang jelas berisi tiga baris: Buku Uji Rani | Desa Melati RT 02 RW 03 | 50.000; Buku Uji Danu | Desa Kenanga | 75.000; Buku Uji Buang | Desa Mawar | 10.000. Buat gambar uji lokal bila perlu, unggah melalui input galeri.
+2. Tunggu hasil, pastikan tiga baris nama/alamat/nominal terpisah dan foto terlihat. Pastikan belum ada catatan baru sebelum menyimpan dan Simpan Semua tidak aktif sebelum konfirmasi review.
+3. Koreksi nominal Rani menjadi 55000, buang baris Buku Uji Buang, dan pastikan total Rp130.000.
+4. Centang konfirmasi pemeriksaan lalu tekan Simpan Semua satu kali. Tunggu status tersimpan. Refresh lalu cari Buku Uji Rani dan Buku Uji Danu.
+5. Pastikan kedua catatan tersimpan dengan nominal 55000 dan 75000, alamat utuh, dan Buku Uji Buang tidak ditambahkan. Hapus hanya kedua data uji yang dibuat tes ini untuk pembersihan.
+
+Expected: Dua baris hasil koreksi tersimpan dan tetap ada setelah refresh; tidak tersimpan otomatis, baris dibuang tidak tersimpan, tampilan mobile tidak melebar, catatan lama tidak berubah.
+
+## Test 10 - Validasi hasil Scan Buku
+Viewport: desktop
+Covers: required fields before batch save, empty/uncertain amount manual correction, Scan Buku rescan, no automatic persistence
+Description: Memastikan baris tidak lengkap harus dikoreksi sebelum simpan.
+
+Steps:
+1. Buka Scan Buku dan unggah foto daftar uji jelas berisi Validasi Buku | Desa Uji | 50.000.
+2. Setelah hasil muncul, kosongkan nominal, centang konfirmasi pemeriksaan, dan pastikan Simpan Semua tidak aktif serta pesan lengkapi data muncul.
+3. Isi nominal 50000, kosongkan nama, dan pastikan Simpan Semua tetap tidak aktif.
+4. Isi nama, kosongkan alamat, lalu pastikan Simpan Semua tetap tidak aktif.
+5. Lengkapi alamat dan centang pemeriksaan; pastikan Simpan Semua menjadi aktif tetapi jangan tekan. Buang baris dan pastikan tidak ada data yang tersimpan.
+
+Expected: Data kosong atau nominal nol tidak bisa disimpan; mengedit membatalkan konfirmasi review. Hasil yang tidak disimpan tidak menambah database.
+
+## Test 1 - Simpan, edit, dan pertahankan catatan [sanity]
+Viewport: desktop
+Covers: database create/read/update, paginated database read, persistence after refresh, format Rupiah
+Description: Memastikan alur utama mencatat amplop bekerja dan datanya persisten.
+
+Steps:
+1. Isi Nama "Budi", Desa "Sukamaju", dan Nominal "1000000", lalu tekan Simpan
+2. Pastikan catatan tampil sebagai Rp1.000.000, lalu edit menjadi "1500000" dan simpan perubahan
+3. Refresh halaman
+
+Expected: Catatan Budi dari Sukamaju tetap ada dengan nominal Rp1.500.000. Daftar menampilkan maksimal 50 catatan per halaman, label Halaman X dari Y, serta tombol Sebelumnya dan Berikutnya. Sebelumnya nonaktif di halaman pertama dan Berikutnya nonaktif di halaman terakhir. Input nominal menerima angka mentah saat fokus dan menampilkan format Rupiah setelah selesai.
+
+## Test 2 - Cari nama dan desa, perbarui hasil, dan kosongkan pencarian
+Viewport: desktop
+Covers: GET /api/search query parameters, pencarian semua halaman database, pencarian nama/desa satu karakter, normalisasi huruf dan spasi, pembatalan hasil lama, filter desa, hasil pencarian setelah PUT /api/records
+Description: Memastikan pencarian menemukan data berdasarkan nama dan desa serta tetap sesuai setelah catatan diedit. Pada desktop kolom pencarian mendapat dua pertiga baris dan filter desa sepertiga, termasuk ketika ada alamat sangat panjang. Pada layar HP pencarian dan filter masing-masing selebar baris. Tombol backup/restore/PDF membungkus di baris terpisah tanpa mendesak input pencarian atau menimbulkan scroll horizontal.
+
+Setup:
+1. Buat catatan "Pencarian Uji Raka" dari "Desa Telaga Uji" senilai 50000
+2. Buat catatan "Pencarian Uji Mira" dari "Desa Bukit Uji" senilai 75000
+
+Steps:
+1. Ketik "uji raka" pada pencarian dan tunggu hasil; pastikan catatan Raka ditemukan dan Mira tidak ditampilkan
+2. Ganti pencarian menjadi "  TELAGA   UJI  " dan pastikan Raka tetap ditemukan
+3. Ganti pencarian menjadi "r" dan pastikan Raka ditemukan sejak satu karakter
+4. Cari "uji raka", edit hanya catatan uji Raka menjadi "Pencarian Uji Raka Baru", simpan perubahan, lalu pastikan hasil pencarian menampilkan nama terbaru
+5. Cepat ganti kata pencarian beberapa kali dan akhiri dengan "zzzzTidakAdaAmplopUjiXYZ"; tunggu hingga selesai dan pastikan hasil kosong, bukan hasil kata sebelumnya
+6. Kosongkan pencarian dan pastikan daftar normal kembali
+7. Cari "uji raka", pilih filter "Desa Bukit Uji", dan pastikan hasil kosong; pilih "Semua Desa" dan pastikan Raka kembali
+8. Kosongkan pencarian dan filter. Bila data lebih dari 50, catat nama pertama, tekan Berikutnya, pastikan halaman 2 berisi maksimal 50 data yang berbeda; tekan Sebelumnya dan pastikan nama pertama kembali. Dari halaman 2 cari nama tersebut dan pastikan kembali ke halaman 1 hasil pencarian. Periksa rentang jumlah data dan batas tombol di halaman terakhir. Jangan menambahkan data massal untuk pengujian ini.
+
+Expected: Nama/desa dicari langsung ke server, termasuk satu karakter, huruf besar, spasi berlebih dan data di halaman berikutnya bila tersedia. Hasil diperbarui setelah edit, hasil permintaan lama tidak mengganti pencarian terbaru, filter desa berlaku, dan mengosongkan pencarian mengembalikan daftar normal.
+
+## Test 3 - Hapus catatan dengan konfirmasi
+Viewport: desktop
+Covers: database delete, destructive confirmation, persistence after refresh
+Description: Memastikan catatan yang dihapus benar-benar hilang dari database.
+
+Setup:
+1. Buat catatan "Hapus Saya" dari "Desa Uji" senilai 10000
+
+Steps:
+1. Tekan tombol hapus pada catatan "Hapus Saya"
+2. Konfirmasi penghapusan
+3. Refresh halaman
+
+Expected: Catatan "Hapus Saya" tidak lagi terlihat setelah refresh.
+
+## Test 4 - Download laporan PDF
+Viewport: desktop
+Covers: ekspor seluruh halaman data tersimpan, paginated GET /api/records, ringkasan total lengkap, laporan cetak PDF
+Description: Memastikan seluruh catatan dapat dibuat menjadi laporan PDF yang rapi.
+
+Setup:
+1. Buat catatan "PDF Uji" dari "Desa PDF" senilai 1000000
+
+Steps:
+1. Tekan tombol "Download PDF"
+2. Periksa halaman laporan/cetak yang terbuka
+3. Periksa tabel dan ringkasan laporan
+
+Expected: Laporan mengambil seluruh halaman database sebelum dicetak dan menampilkan Nama PDF Uji, Desa PDF, Rp1.000.000, total amplop lengkap, jumlah pemberi lengkap, jumlah desa lengkap, dan dialog cetak yang dapat disimpan sebagai PDF.
+
+## Test 5 - Backup dan restore database JSON
+Viewport: desktop
+Covers: backup seluruh halaman database, paginated GET /api/records, restore JSON bertahap POST /api/restore tanpa menghapus data lama
+Description: Memastikan data dapat dicadangkan dan dipulihkan saat pindah hosting.
+
+Setup:
+1. Buat catatan "Backup Uji" dari "Desa Backup" senilai 75000
+
+Steps:
+1. Tekan "Backup Data" dan simpan file JSON
+2. Tekan "Restore Backup", pilih file JSON tersebut, lalu konfirmasi
+3. Periksa daftar catatan setelah restore
+
+Expected: File backup JSON berisi seluruh data lintas halaman. Backup besar dipulihkan per batch maksimal 200 record tanpa menghapus catatan yang sudah ada, dan progres restore terlihat.
+
+## Test 6 - Tolak data tidak valid di mobile
+Viewport: mobile
+Covers: validasi form, guardrail write, responsive form
+Description: Memastikan data kosong atau nominal nol tidak dapat disimpan.
+
+Steps:
+1. Biarkan Nama kosong, isi Desa "Sukamaju", dan Nominal "0"
+2. Tekan Simpan
+3. Periksa daftar catatan
+
+Expected: Pesan validasi terlihat dan tidak ada catatan baru yang dibuat.
+
+## Test 7 - Rekam voice mobile, transkripsi backend, dan review sebelum simpan
+Viewport: mobile
+Covers: microphone recording UI, POST /api/transcribe, AI audio transcription, village-aware correction, manual review before save
+Description: Memastikan voice di HP direkam sebagai audio, diproses backend, memakai desa tersimpan sebagai referensi, dan tidak tersimpan otomatis.
+
+Setup:
+1. Buat catatan manual "Referensi" dari desa "Gindo Suli" senilai 10000
+
+Steps:
+1. Tekan tombol "Isi dengan suara" dan izinkan microphone
+2. Ucapkan "Budi gindo sulih empat puluh ribu", lalu tekan "Selesai & Proses"
+3. Ulangi dengan transkripsi bernominal digit dan tanda baca, misalnya "Budi, Gindo Suli, 1.000.000."
+4. Periksa hasil form tanpa menekan Simpan
+
+Expected: Hasil transkripsi terlihat, Nama terisi Budi, desa dikoreksi menjadi Gindo Suli, nominal voice kata maupun digit terpisah dari desa. "Budi, Gindo Suli, 1.000.000." menghasilkan Nama Budi, Desa Gindo Suli, Nominal Rp1.000.000. Ucapan "satu juta lima ratus ribu" menghasilkan Rp1.500.000, dan data belum tersimpan sebelum tombol Simpan ditekan.
+
+## Test 8 - Scan Amplop dari kamera/foto dan review sebelum simpan
+Viewport: mobile
+Covers: camera/photo picker, client image resize, POST /api/scan-envelope, AI structured image extraction, nama/desa extraction, alamat panjang beberapa baris tanpa pemendekan dan tanpa koreksi desa otomatis, visible rupiah denomination counting, written nominal without banknotes, multiple giver names with titles and aliases, raw OCR review, missing/conflicting nominal clears previous value, Rp5.000 correction controls, manual review before save
+Description: Memastikan foto amplop dapat dibaca untuk mengisi nama, desa, dan total uang yang benar-benar terlihat tanpa menyimpan otomatis.
+
+Steps:
+1. Tekan "Scan Amplop", ambil/pilih foto yang jelas berisi tulisan nama "Budi" dan alamat beberapa baris "Dusun Sukaraja Baru, RT 02/RW 03, Desa Tanjung Alam, Kecamatan Kedurang", satu lembar Rp10.000 dan satu lembar Rp5.000 yang seluruhnya terlihat
+2. Tunggu analisis selesai dan periksa Nama, Desa, Nominal, daftar uang terlihat, serta keyakinan
+3. Tekan + Rp5.000 lalu − Rp5.000 dan periksa nominal kembali
+4. Scan foto tulisan tangan yang memuat dua nama lengkap beserta gelar/alias, alamat jalan pada baris ketiga, kota dengan spasi lebar pada baris keempat, dan angka 100.000 tersendiri tanpa lembar uang. Pastikan kedua nama utuh, alamat utuh, dan nominal Rp100.000 bersumber dari tulisan; transkripsi tampil untuk diperiksa.
+5. Scan ulang foto tanpa nominal yang terbaca dan pastikan nominal lama dikosongkan. Bila tulisan nominal berbeda dari lembar uang yang terlihat, nominal kosong dengan peringatan konflik, bukan dijumlahkan.
+6. Jangan tekan Simpan.
+
+Expected: Kolom Desa / alamat lengkap memuat semua bagian alamat termasuk RT 02/RW 03 dan Kecamatan Kedurang, dapat dibaca beberapa baris, dan tidak diganti dengan desa lain yang mirip. Jika tulisan tidak terbaca, peringatan tetap ditampilkan termasuk ketika uang juga tidak terbaca. Form diisi dari hasil foto, total yang diharapkan untuk foto uji adalah Rp15.000 bila kedua pecahan dikenali, rincian pecahan/keyakinan tampil, tombol koreksi mengubah nominal tepat Rp5.000, peringatan meminta semua lembar terlihat, dan hasil scan belum masuk database sebelum Simpan.

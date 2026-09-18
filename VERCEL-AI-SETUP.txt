@@ -1,0 +1,47 @@
+CATATAN AMPLOP — KONFIGURASI VOICE DAN SCAN
+
+Paket ini berisi sumber React/Vite dan Vercel Functions. Bukan hanya dist.
+
+PASANG KE PROYEK VERCEL YANG SAMA
+1. Ekstrak ZIP. Upload/commit SELURUH isi Catatan-Amplop ke repository yang
+   terhubung ke proyek catatan-amplop-vercel-supabase. Jangan upload dist saja.
+2. Vercel > Project > Settings > Build and Deployment:
+   - Root Directory: Catatan-Amplop jika folder tersebut ada di root repo.
+     Jika package.json, api, lib, src, dan vercel.json langsung di root repo,
+     kosongkan Root Directory (root repo).
+   - Framework Preset: Vite
+   - Build Command: npm run build
+   - Output Directory: dist
+   - Node.js: 22.x
+   Folder api dan lib HARUS berada di Root Directory yang sama dengan package.json.
+3. Settings > Environment Variables: pastikan OPENAI_API_KEY sudah terpasang
+   untuk Production. Jangan kirim API key lewat chat atau masukkan ke src.
+   OPENAI_VISION_MODEL: gpt-4.1-mini
+   OPENAI_TRANSCRIBE_MODEL: gpt-4o-mini-transcribe
+   Jika variabel model lama sudah ada, ubah juga nilainya; environment mengalahkan default.
+4. Deploy commit terbaru ke Production pada proyek yang sama.
+   Redeploy commit lama yang belum berisi API tidak akan memperbaiki 404.
+5. Periksa daftar Functions di deployment: transcribe, scan-envelope, scan-book.
+6. Buka /api/transcribe, /api/scan-envelope, /api/scan-book di browser.
+   GET harus mengembalikan JSON 'Method tidak diizinkan.' (405), bukan 404.
+   Ini hanya memeriksa pemasangan route, bukan membuktikan key/model berfungsi.
+7. Uji lewat website: voice singkat, foto amplop, dan satu foto buku.
+   Periksa hasil sebelum Simpan. Permintaan AI sungguhan memakai saldo API.
+
+PERUBAHAN
+- vercel.json: framework, build, dist, dan durasi function 60 detik.
+- Helper AI dipindah ke lib agar bukan kandidat endpoint API.
+- Default vision gpt-4.1-mini, transkripsi gpt-4o-mini-transcribe.
+- Timeout panggilan AI 50 detik dan pesan error key/model/kuota yang aman.
+- Foto dikonversi JPEG, maksimal 1600px/2MP dan 3MB sebelum base64.
+- Error API tampil pada voice, scan amplop, dan scan buku.
+- Lockfile dependency dan pengujian lokal tersedia.
+
+VALIDASI DAN BATAS
+npm test: simulasi provider AI; tidak menghubungi OpenAI atau database.
+npm run build: build frontend. npx tsc --noEmit: pemeriksaan TypeScript.
+Deployment Vercel dan key/model akun pengguna tetap perlu diverifikasi langsung.
+Akses Vercel sesi pengerjaan tidak menampilkan tim/proyek pengguna.
+Belum ada autentikasi/rate limit API; perubahan ini berfokus pada fungsi voice/scan.
+Pagination database dan aturan akses Supabase tidak diubah.
+DATABASE/BACKUP ISI CATATAN TIDAK TERMASUK. Data Supabase tidak diubah.

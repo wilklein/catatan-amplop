@@ -1,0 +1,6 @@
+CATATAN AMPLOP — VERCEL + SUPABASE
+Baca VERCEL-AI-SETUP.txt untuk pemasangan pada proyek Vercel yang sama.
+ZIP berisi kode, konfigurasi, dan tes. Isi database tidak disertakan.
+Database Supabase dan data pengguna tidak diubah dalam perbaikan ini.
+Gunakan Backup Data di aplikasi untuk menyimpan JSON catatan; pagination
+backup versi ini belum diperbaiki dan perlu diverifikasi untuk data besar.

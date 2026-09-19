@@ -1,6 +1,7 @@
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { BookOpen, Camera, Upload, Trash2 } from 'lucide-react';
-import { api, image } from './cloud';
+import { api } from './cloud';
+import { readImage, parseRows } from './localOcr';
 
 type Row = { key: string; name: string; village: string; amount: string; warning: string; state: 'pending' | 'saved' | 'unknown' };
 type RecordInfo = { name: string; village: string; amount: number };
@@ -32,21 +33,16 @@ export default function BookScanner({ records, onSaved }: { records: RecordInfo[
     if (!selected.type.startsWith('image/')) { setMessage('Pilih file foto JPG, PNG, atau WebP.'); return; }
     if (selected.size > 30_000_000) { setMessage('Foto terlalu besar. Pilih foto di bawah 30 MB.'); return; }
     if (rows.some(r => r.state !== 'saved') && !window.confirm('Ganti hasil scan yang belum selesai?')) return;
-    lock.current = true;
-    setBusy(true); setRows([]); setReviewed(false); setWarning('');
-    setFile(selected); setPhoto(URL.createObjectURL(selected));
-    setMessage('Membaca halaman buku…');
+    lock.current=true; setBusy(true); setRows([]); setReviewed(false); setWarning('');
+    setFile(selected); setPhoto(URL.createObjectURL(selected)); setMessage('OCR lokal membaca halaman tanpa AI…');
     try {
-      const prepared = await image.resizeIfNeeded(selected, { maxDimension: 1600, maxPixels: 2_000_000, quality: 0.9, mimeType: 'image/jpeg' });
-      const response = await api.post('/api/scan-book', { data: prepared.data, mimeType: prepared.mimeType });
-      if (!Array.isArray(response.data.rows)) throw new Error('Hasil tidak valid');
-      const results = response.data.rows as Array<{ name?: string; village?: string; amount?: number | null; warning?: string }>;
-      setRows(results.map((r, i) => ({ key: String(i), name: r.name ?? '', village: r.village ?? '', amount: r.amount == null ? '' : String(r.amount), warning: r.warning ?? '', state: 'pending' })));
-      setWarning(response.data.warning ?? '');
-      setMessage(results.length ? `${results.length} baris terbaca. Cocokkan SEMUA baris dan jumlah orang dengan foto sebelum menyimpan.` : 'Tidak ada baris terbaca. Foto lebih dekat dan pastikan halaman tidak terpotong.');
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Foto gagal diproses. Coba lagi.');
-    } finally { lock.current = false; setBusy(false); }
+      const ocr=await readImage(selected);
+      const results=parseRows(ocr.text);
+      setRows(results.map((r,i)=>({key:String(i),name:r.name,village:r.village,amount:r.amount==null?'':String(r.amount),warning:r.warning??'',state:'pending'})));
+      setWarning(`OCR lokal · keyakinan ${ocr.confidence}%. Periksa semua baris sebelum menyimpan.`);
+      setMessage(results.length?`${results.length} baris dengan nominal terbaca. Koreksi hasil bila perlu.`:'Belum ada baris yang terbaca. Foto lebih dekat, terang, dan lurus.');
+    } catch { setMessage('OCR lokal gagal membaca halaman. Coba foto lebih dekat dan terang.'); }
+    finally { lock.current=false; setBusy(false); }
   }
   function pick(e: ChangeEvent<HTMLInputElement>) {
     const selected = e.target.files?.[0]; e.target.value = '';
@@ -89,7 +85,7 @@ export default function BookScanner({ records, onSaved }: { records: RecordInfo[
       <BookOpen size={22} /> Scan Buku <span className='ml-auto text-sm text-slate-500'>{open ? 'Tutup panel' : 'Buka'}</span>
     </button>
     {open && <div className='mt-4 space-y-4'>
-      <p className='text-slate-600'>Foto satu halaman berisi nama, desa/alamat, dan nominal. Setelah terbaca, periksa setiap baris lalu simpan. Tulisan kecil atau rapat sebaiknya difoto per bagian.</p>
+      <p className='text-slate-600'>Scan buku tanpa AI menggunakan OCR lokal/browser. Foto halaman dengan terang dan lurus, lalu periksa setiap hasil sebelum menyimpan.</p>
       <div className='flex flex-wrap gap-2'>
         <button type='button' disabled={busy} className={buttonClass} onClick={() => camera.current?.click()}><Camera className='mr-2 inline' size={18} />Foto Buku</button>
         <button type='button' disabled={busy} className={buttonClass} onClick={() => gallery.current?.click()}><Upload className='mr-2 inline' size={18} />Pilih Foto Buku</button>

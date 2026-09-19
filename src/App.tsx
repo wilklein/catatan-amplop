@@ -2,6 +2,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 're
 import { Camera, Download, Mail, MapPin, Mic, Pencil, Search, Trash2, Users } from 'lucide-react';
 import { api, image } from './cloud';
 import BookScanner from './BookScanner';
+import { readImage, parseSingle } from './localOcr';
 
 type Item = {
   id: string;
@@ -332,37 +333,19 @@ function App() {
   async function scanEnvelope(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setStatus('Pilih foto amplop dan uang yang valid.');
-      return;
-    }
-    setScanning(true);
-    setScanDetail('');
-    setStatus('Membaca tulisan foto: semua nama, alamat, dan nominal...');
+    if (!file || !file.type.startsWith('image/')) { setStatus('Pilih foto yang valid.'); return; }
+    setScanning(true); setScanDetail(''); setStatus('OCR lokal membaca foto tanpa AI...');
     try {
-      const prepared = await image.resizeIfNeeded(file, { maxDimension: 1600, maxPixels: 2_000_000, quality: 0.82, mimeType: 'image/jpeg' });
-      const response = await api.post('/api/scan-envelope', {
-        data: prepared.data,
-        mimeType: prepared.mimeType,
-        villages: villages.slice(0, 100),
-      });
-      const result = response.data.result as { name?: string; village?: string; amount?: number | null; denominations?: string[]; confidence?: number; warning?: string; rawText?: string; amountSource?: string };
-      setName(result.name?.trim() ?? '');
-      setVillage(result.village?.trim() ?? '');
-      setAmount(Number.isSafeInteger(result.amount) && Number(result.amount) > 0 ? String(result.amount) : '');
-      const pieces = Array.isArray(result.denominations) && result.denominations.length ? `Uang terlihat: ${result.denominations.join(' + ')}.` : '';
-      const confidence = typeof result.confidence === 'number' ? ` Keyakinan ${Math.round(result.confidence)}%.` : '';
-      const warning = result.warning ? ` ${result.warning}` : '';
-      const source = result.amountSource === 'written' ? 'Nominal dibaca dari tulisan amplop.' : result.amountSource === 'banknotes' ? 'Nominal dihitung dari uang terlihat.' : '';
-      const raw = result.rawText ? `\nTulisan terbaca:\n${result.rawText}` : '';
-      setScanDetail(`${source} ${pieces}${confidence}${warning}${raw}`.trim());
-      setStatus(result.name && result.village && result.amount && !result.warning ? 'Foto berhasil dibaca. Periksa nama, alamat lengkap, dan nominal lalu tekan Simpan.' : 'Periksa hasil foto dan peringatan. Lengkapi atau koreksi alamat serta nominal sebelum Simpan.');
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Foto gagal diproses. Coba lagi.');
-    } finally {
-      setScanning(false);
-    }
+      const ocr = await readImage(file);
+      const result = parseSingle(ocr.text);
+      const matchedVillage = result.village ? bestKnownVillage(result.village, villages) : '';
+      setName(result.name);
+      setVillage(matchedVillage);
+      setAmount(result.amount ? String(result.amount) : '');
+      setScanDetail(`OCR lokal · keyakinan ${ocr.confidence}%\nTulisan terbaca:\n${ocr.text}`);
+      setStatus('Scan tanpa AI selesai. Periksa hasil lalu tekan Simpan.');
+    } catch { setStatus('OCR lokal gagal membaca foto. Coba foto lebih dekat dan terang.'); }
+    finally { setScanning(false); }
   }
 
   function adjustScannedAmount(delta: number) {

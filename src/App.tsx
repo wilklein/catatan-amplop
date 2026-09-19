@@ -209,9 +209,7 @@ function App() {
   const [scanDetail, setScanDetail] = useState('');
   const [scanning, setScanning] = useState(false);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const speechRecognitionRef = useRef<any>(null);
 
   async function load() {
     try {
@@ -487,99 +485,41 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function blobToBase64(blob: Blob) {
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = String(reader.result ?? '');
-        resolve(result.includes(',') ? result.split(',')[1] : result);
-      };
-      reader.onerror = () => reject(new Error('Gagal membaca rekaman.'));
-      reader.readAsDataURL(blob);
-    });
-  }
-
-  async function processRecording(blob: Blob) {
-    if (blob.size === 0) {
-      setStatus('Rekaman kosong. Silakan coba lagi.');
+  function startVoice() {
+    if (listening) {
+      speechRecognitionRef.current?.stop();
       return;
     }
-    if (blob.size > 2_000_000) {
-      setStatus('Rekaman terlalu panjang. Coba ucapkan lebih singkat.');
+    const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!Recognition) {
+      setStatus('Voice tanpa AI belum didukung browser ini. Gunakan Chrome terbaru.');
       return;
     }
-    setStatus('Memproses suara...');
-    try {
-      const data = await blobToBase64(blob);
-      const response = await api.post('/api/transcribe', {
-        data,
-        mimeType: blob.type || 'audio/webm',
-        villages: villages.slice(0, 100),
-      });
-      const text = String(response.data.transcript ?? '').trim();
-      if (!text) {
-        setStatus('Suara belum berhasil dikenali. Silakan coba lagi.');
-        return;
-      }
+    const recognition = new Recognition();
+    speechRecognitionRef.current = recognition;
+    recognition.lang = 'id-ID';
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => {
+      setListening(true);
+      setStatus('Mendengarkan suara...');
+    };
+    recognition.onresult = (event: any) => {
+      const text = String(event.results?.[0]?.[0]?.transcript ?? '').trim();
       setTranscript(text);
       const parsed = parseVoice(text, villages);
       if (parsed.name) setName(parsed.name);
       if (parsed.village) setVillage(parsed.village);
       if (parsed.amount) setAmount(String(parsed.amount));
-      setStatus(
-        parsed.name && parsed.village && parsed.amount
-          ? 'Suara berhasil dibaca. Periksa data lalu tekan Simpan.'
-          : 'Sebagian data perlu diperiksa manual.'
-      );
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Voice gagal diproses. Coba lagi.');
-    }
-  }
-
-  async function startVoice() {
-    if (listening) {
-      mediaRecorderRef.current?.stop();
-      return;
-    }
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-      setStatus('Perekaman suara tidak didukung browser ini. Coba Chrome atau Safari terbaru.');
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStreamRef.current = stream;
-      audioChunksRef.current = [];
-      const preferredTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
-      const mimeType = preferredTypes.find(type => MediaRecorder.isTypeSupported(type));
-      const recorder = new MediaRecorder(stream, {
-        ...(mimeType ? { mimeType } : {}),
-        audioBitsPerSecond: 32000,
-      });
-      mediaRecorderRef.current = recorder;
-      recorder.ondataavailable = event => {
-        if (event.data.size > 0) audioChunksRef.current.push(event.data);
-      };
-      recorder.onstop = async () => {
-        setListening(false);
-        stream.getTracks().forEach(track => track.stop());
-        mediaStreamRef.current = null;
-        const blob = new Blob(audioChunksRef.current, {
-          type: recorder.mimeType || mimeType || 'audio/webm',
-        });
-        await processRecording(blob);
-      };
-      recorder.onerror = () => {
-        setListening(false);
-        stream.getTracks().forEach(track => track.stop());
-        setStatus('Perekaman suara gagal. Silakan coba lagi.');
-      };
-      recorder.start();
-      setListening(true);
-      setStatus('Mendengarkan... tekan lagi untuk selesai.');
-    } catch {
+      setStatus(parsed.name && parsed.village && parsed.amount ? 'Voice berhasil. Periksa data lalu tekan Simpan.' : 'Suara terbaca. Periksa kolom sebelum Simpan.');
+    };
+    recognition.onerror = () => setStatus('Voice browser gagal. Periksa izin mikrofon lalu coba lagi.');
+    recognition.onend = () => {
       setListening(false);
-      setStatus('Izin microphone diperlukan untuk menggunakan voice input.');
-    }
+      speechRecognitionRef.current = null;
+    };
+    recognition.start();
   }
 
   return (
@@ -696,7 +636,7 @@ function App() {
             )}
           </div>
           <p className="mt-2 text-sm text-slate-500">
-            Contoh: “Budi Gindo Suli empat puluh ribu”. Tekan sekali untuk merekam, lalu tekan lagi untuk memproses.
+            Voice tanpa AI. Contoh: “Budi desa Gindo Suli empat puluh ribu”. Ucapkan nama, desa/alamat, lalu nominal.
           </p>
           {transcript && (
             <p className="mt-2 text-sm">Hasil suara: “{transcript}”</p>

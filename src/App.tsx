@@ -413,8 +413,26 @@ function App() {
       const allVillages = new Set(allRecords.map(record => record.village));
       // Hanya laporan PDF yang diurutkan: desa/alamat A-Z, lalu nama A-Z.
       // Urutan tampilan aplikasi tetap data terbaru di atas.
+      const pdfVillageKey = (value: string) => {
+        const normalized = normalizeVillage(value)
+          .replace(/\b(?:desa|ds|kelurahan|kel)\b/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        // Satukan variasi ejaan desa yang sangat mirip ke nama referensi yang sudah ada.
+        let best = normalized;
+        let bestScore = 0;
+        for (const village of allVillages) {
+          const candidate = normalizeVillage(village)
+            .replace(/\b(?:desa|ds|kelurahan|kel)\b/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          const score = villageSimilarity(normalized, candidate);
+          if (score > bestScore) { bestScore = score; best = candidate; }
+        }
+        return bestScore >= 0.72 ? best : normalized;
+      };
       const pdfRecords = [...allRecords].sort((a, b) => {
-        const byVillage = a.village.localeCompare(b.village, 'id-ID', { sensitivity: 'base', numeric: true });
+        const byVillage = pdfVillageKey(a.village).localeCompare(pdfVillageKey(b.village), 'id-ID', { sensitivity: 'base', numeric: true });
         if (byVillage !== 0) return byVillage;
         return a.name.localeCompare(b.name, 'id-ID', { sensitivity: 'base', numeric: true });
       });

@@ -110,16 +110,20 @@ function villageSimilarity(a: string, b: string) {
 }
 
 function bestKnownVillage(candidate: string, knownVillages: string[]) {
-  let best = candidate;
+  const cleanCandidate = candidate.trim();
+  const exact = knownVillages.find(v => normalizeVillage(v) === normalizeVillage(cleanCandidate));
+  if (exact) return exact;
+  let best = cleanCandidate;
   let score = 0;
   for (const village of knownVillages) {
-    const current = villageSimilarity(candidate, village);
+    const current = villageSimilarity(cleanCandidate, village);
     if (current > score) {
       score = current;
       best = village;
     }
   }
-  return score >= 0.68 ? best : titleCase(candidate);
+  // Kamus database + fuzzy matching: typo kecil memakai ejaan desa/alamat yang sudah tersimpan.
+  return score >= 0.62 ? best : titleCase(cleanCandidate);
 }
 
 function parseVoice(text: string, knownVillages: string[] = []): VoiceResult {
@@ -166,7 +170,7 @@ function parseVoice(text: string, knownVillages: string[] = []): VoiceResult {
       }
     }
   }
-  if (bestMatch && bestMatch.score >= 0.68) {
+  if (bestMatch && bestMatch.score >= 0.62) {
     return {
       name: titleCase(identityWords.slice(0, bestMatch.start).join(' ')),
       village: bestMatch.village,

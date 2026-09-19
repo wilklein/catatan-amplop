@@ -4,9 +4,17 @@ const headers={apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,'Conte
 type AnyObj=Record<string,any>;
 const mapRow=(r:AnyObj)=>({id:r.id,name:r.name,village:r.village,amount:Number(r.amount),createdAt:r.created_at,updatedAt:r.updated_at});
 async function req(path:string,init:RequestInit={}){const res=await fetch(SUPABASE_URL+'/rest/v1/'+path,{...init,headers:{...headers,...(init.headers||{})}});if(!res.ok)throw new Error(await res.text());const text=await res.text();return text?JSON.parse(text):null;}
-const normalize=(v:any)=>String(v??'').normalize('NFKC').toLocaleLowerCase('id-ID').replace(/\s+/g,' ').trim();
-const recordKey=(r:any)=>normalize(r.name)+'|'+normalize(r.village)+'|'+Number(r.amount);
-function uniqueRecords(rows:any[]){const seen=new Set<string>();return rows.filter(r=>{const k=recordKey(r);if(seen.has(k))return false;seen.add(k);return true;});}
+const normalize=(v:any)=>String(v??'').normalize('NFKC').toLocaleLowerCase('id-ID')
+ .replace(/\b(jalan|jln|jl)\.?\b/g,'jl')
+ .replace(/\b(desa|ds)\.?\b/g,'desa')
+ .replace(/\b(kecamatan|kec)\.?\b/g,'kec')
+ .replace(/\b(kabupaten|kab)\.?\b/g,'kab')
+ .replace(/[^a-z0-9]+/g,' ')
+ .replace(/\s+/g,' ').trim();
+const nameKey=(r:any)=>normalize(r.name);
+const recordKey=(r:any)=>nameKey(r)+'|'+Number(r.amount);
+const similarity=(a:string,b:string)=>{if(a===b)return 1;const A=new Set(a.split(' ').filter(Boolean)),B=new Set(b.split(' ').filter(Boolean));const inter=[...A].filter(x=>B.has(x)).length;return inter/Math.max(A.size,B.size,1);};
+function uniqueRecords(rows:any[]){const kept:any[]=[];for(const r of rows){const nk=nameKey(r),amt=Number(r.amount),vk=normalize(r.village);const dup=kept.some(x=>Number(x.amount)===amt&&nameKey(x)===nk&&(normalize(x.village)===vk||similarity(normalize(x.village),vk)>=0.5));if(!dup)kept.push(r);}return kept;}
 async function list(){const rows=await req('amplop_records?select=*&order=created_at.desc&limit=10000');return uniqueRecords(rows.map(mapRow));}
 export const api={
  async get(path:string){if(path.startsWith('/api/records'))return{data:{records:await list(),nextToken:null}};if(path.startsWith('/api/search')){const q=new URL(path,'https://x').searchParams.get('q')?.trim().toLowerCase()||'';const rows=(await list()).filter((r:any)=>(r.name+' '+r.village).toLowerCase().includes(q));return{data:{records:rows,nextToken:null}};}throw new Error('Endpoint belum tersedia');},

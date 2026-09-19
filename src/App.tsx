@@ -135,9 +135,11 @@ function parseVoice(text: string, knownVillages: string[] = []): VoiceResult {
   );
   const amountText = amountMatch?.[1] ?? '';
   const amount = amountText ? parseIndonesianNumber(amountText) : null;
-  const identity = amountText
-    ? normalized.slice(0, normalized.length - amountText.length).trim()
-    : normalized;
+  const identity = (amountText
+    ? normalized.slice(0, normalized.length - amountText.length)
+    : normalized)
+    .replace(/\b(?:rp|rupiah)\b\.?\s*$/i, '')
+    .trim();
   const marker = identity.match(/^(.*?)\s+(?:(?:dari|asal)\s+)?desa\s+(.+)$/i);
   if (marker) {
     return {

@@ -411,8 +411,15 @@ function App() {
       }
       const allTotal = allRecords.reduce((sum, record) => sum + record.amount, 0);
       const allVillages = new Set(allRecords.map(record => record.village));
+      // Hanya laporan PDF yang diurutkan: desa/alamat A-Z, lalu nama A-Z.
+      // Urutan tampilan aplikasi tetap data terbaru di atas.
+      const pdfRecords = [...allRecords].sort((a, b) => {
+        const byVillage = a.village.localeCompare(b.village, 'id-ID', { sensitivity: 'base', numeric: true });
+        if (byVillage !== 0) return byVillage;
+        return a.name.localeCompare(b.name, 'id-ID', { sensitivity: 'base', numeric: true });
+      });
       const escapeHtml = (value: string) => value.replace(/[&<>\"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#039;' })[char] ?? char);
-      const rows = allRecords.map((r, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.village)}</td><td class='money'>${rupiah(r.amount)}</td><td>${new Date(r.createdAt).toLocaleDateString('id-ID')}</td></tr>`).join('');
+      const rows = pdfRecords.map((r, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.village)}</td><td class='money'>${rupiah(r.amount)}</td><td>${new Date(r.createdAt).toLocaleDateString('id-ID')}</td></tr>`).join('');
       const report = `<!doctype html><html><head><meta charset='utf-8'><title>Catatan Amplop</title><style>@page{size:A4;margin:14mm}body{font-family:Arial,sans-serif;color:#0f172a}h1{margin:0 0 4px;font-size:24px}.meta{color:#64748b;margin-bottom:18px}.summary{display:flex;gap:24px;margin:14px 0 20px;font-weight:700}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #cbd5e1;padding:7px;text-align:left}th{background:#f1f5f9}.money{text-align:right;white-space:nowrap}tfoot td{font-weight:700}p.note{font-size:11px;color:#64748b;margin-top:14px}</style></head><body><h1>Catatan Amplop</h1><div class='meta'>Dicetak ${new Date().toLocaleString('id-ID')}</div><div class='summary'><span>Total: ${rupiah(allTotal)}</span><span>${allRecords.length} pemberi</span><span>${allVillages.size} desa</span></div><table><thead><tr><th>No</th><th>Nama</th><th>Desa</th><th>Nominal</th><th>Tanggal</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan='3'>Total Amplop</td><td class='money'>${rupiah(allTotal)}</td><td></td></tr></tfoot></table><p class='note'>Laporan dibuat dari data Catatan Amplop.</p><script>window.onload=()=>{window.print()}<\/script></body></html>`;
     const printWindow = window.open('', '_blank');
     if (!printWindow) {

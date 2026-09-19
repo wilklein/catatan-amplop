@@ -173,14 +173,17 @@ function parseVoice(text: string, knownVillages: string[] = []): VoiceResult {
   }
   if (bestMatch && bestMatch.score >= 0.62) {
     return {
+      // Nama tidak pernah dikoreksi dengan kamus/fuzzy. Hanya alamat/desa yang dicocokkan.
       name: titleCase(identityWords.slice(0, bestMatch.start).join(' ')),
       village: bestMatch.village,
       amount,
     };
   }
+  // Tanpa kecocokan alamat yang cukup kuat, jangan menebak atau mengubah nama.
+  // Biarkan pengguna memeriksa hasil Speech Recognition apa adanya.
   return {
-    name: titleCase(identityWords[0]),
-    village: titleCase(identityWords.slice(1).join(' ')),
+    name: titleCase(identity),
+    village: '',
     amount,
   };
 }
